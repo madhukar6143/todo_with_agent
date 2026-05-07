@@ -23,8 +23,8 @@ export default function App() {
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 px-4 py-12">
       <div className="mx-auto w-full max-w-lg">
         <header className="mb-8 text-center">
-          <h1 className="text-4xl font-bold text-white tracking-tight">Todo</h1>
-          <p className="mt-1 text-sm text-white">Stay organised, get things done.</p>
+          <h1 className="text-4xl font-bold text-green-900 tracking-tight">Todo</h1>
+          <p className="mt-1 text-sm text-green-900">Stay organised, get things done.</p>
         </header>
 
         <div className="rounded-2xl bg-white p-6 shadow-lg">
@@ -37,7 +37,7 @@ export default function App() {
           )}
 
           {loading ? (
-            <p className="py-8 text-center text-sm text-white">Loading…</p>
+            <p className="py-8 text-center text-sm text-green-900">Loading…</p>
           ) : (
             <>
               <FilterBar current={filter} onChange={setFilter} counts={counts} />

@@ -33,7 +33,7 @@ export function AddTodo({ onAdd }) {
         placeholder="What needs to be done?"
         disabled={submitting}
         aria-label="New todo title"
-        className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm text-white placeholder-white focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-50"
+        className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm text-green-900 placeholder-green-900 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-50"
       />
       <button
         type="submit"

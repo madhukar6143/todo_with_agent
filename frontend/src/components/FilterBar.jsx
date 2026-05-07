@@ -12,14 +12,14 @@ export function FilterBar({ current, onChange, counts }) {
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
               current === f
                 ? 'bg-blue-900 text-white'
-                : 'text-white hover:bg-blue-50 hover:text-blue-700'
+                : 'text-green-900 hover:bg-blue-50 hover:text-blue-700'
             }`}
           >
             {f}
           </button>
         ))}
       </div>
-      <span className="text-xs text-white">
+      <span className="text-xs text-green-900">
         {counts.active} left
       </span>
     </div>
