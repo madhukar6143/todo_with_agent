@@ -11,7 +11,7 @@ export function FilterBar({ current, onChange, counts }) {
             aria-pressed={current === f}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
               current === f
-                ? 'bg-indigo-600 text-white'
+                ? 'bg-gray-500 text-white'
                 : 'text-gray-500 hover:bg-gray-100'
             }`}
           >
