@@ -40,7 +40,7 @@ export function AddTodo({ onAdd }) {
         disabled={submitting}
         className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-900 active:bg-gray-800 disabled:opacity-50 transition-colors"
       >
-        {submitting ? 'Adding…' : 'Add'}
+        {submitting ? 'Adding…' : 'Add Item'}
       </button>
       {error && (
         <p role="alert" className="absolute mt-10 text-xs text-red-500">{error}</p>
