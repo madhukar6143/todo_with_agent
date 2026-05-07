@@ -1,6 +1,6 @@
 /**
- * Shared agent runner — used by both server.js and cli.js
- * UI Agent → QA Agent → Merge Agent (waits for human approval)
+ * Shared agent runner — UI Agent → QA Agent → Merge Agent
+ * All log output goes to both terminal and the live dashboard via logger.js
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -8,6 +8,7 @@ import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
+import { emit } from './logger.js';
 
 const client = new Anthropic();
 const ROOT   = path.resolve(import.meta.dirname, '..');
@@ -65,7 +66,7 @@ function sourceSnapshot() {
 // ── AGENT 1: UI ──────────────────────────────────────────────────────────────
 
 async function uiAgent(task) {
-  console.log('\n🎨  [UI Agent] analysing task and editing files...');
+  emit('🎨  [UI Agent] Reading source files…', 'ui');
 
   const response = await claude(
     `You are a frontend UI engineer for a React + Tailwind CSS todo app.
@@ -82,70 +83,77 @@ Only include files that actually need to change. Output valid JSON only — no e
     throw new Error('UI Agent returned invalid JSON:\n' + response);
   }
 
+  emit(`🎨  [UI Agent] Applying ${edits.length} file edit(s)…`, 'ui');
   for (const { file, content } of edits) {
     writeFile(file, content);
-    console.log(`  ✏️   Edited: ${file}`);
+    emit(`  ✏️   Edited: ${file}`, 'file');
   }
 
+  emit('🎨  [UI Agent] Done.', 'ui');
   return edits.map((e) => e.file);
 }
 
 // ── AGENT 2: QA ──────────────────────────────────────────────────────────────
 
 async function qaAgent(changedFiles) {
-  console.log('\n🧪  [QA Agent] running test suites...');
-
+  emit('🧪  [QA Agent] Running frontend tests (Vitest)…', 'qa');
   const fe = run('npm test', path.join(ROOT, 'frontend'));
+  emit(`  Frontend: ${fe.ok ? '✅ PASS' : '❌ FAIL'}`, fe.ok ? 'success' : 'error');
+
+  emit('🧪  [QA Agent] Running backend tests (Jest)…', 'qa');
   const be = run('npm test', path.join(ROOT, 'backend'));
+  emit(`  Backend:  ${be.ok ? '✅ PASS' : '❌ FAIL'}`, be.ok ? 'success' : 'error');
 
-  const feLabel = fe.ok ? '✅ PASS' : '❌ FAIL';
-  const beLabel = be.ok ? '✅ PASS' : '❌ FAIL';
-  console.log(`  Frontend (Vitest):        ${feLabel}`);
-  console.log(`  Backend  (Jest+Supertest): ${beLabel}`);
-
+  emit('🧪  [QA Agent] Generating QA report…', 'qa');
   const report = await claude(
     'You are a QA engineer. Write a concise 3–5 line QA report based on the test output.',
     `Changed: ${changedFiles.join(', ')}\n\nFrontend:\n${fe.output}\n\nBackend:\n${be.output}`
   );
 
-  console.log('\n📋  QA Report:\n' + report);
+  emit('📋  QA Report:', 'qa');
+  report.split('\n').filter(Boolean).forEach(line => emit(`  ${line}`, 'qa'));
+
   return { passed: fe.ok && be.ok, report };
 }
 
 // ── AGENT 3: MERGE ───────────────────────────────────────────────────────────
 
 async function mergeAgent(task, changedFiles, autoMerge) {
-  console.log('\n🔀  [Merge Agent] ready to commit.\n');
+  emit('🔀  [Merge Agent] All tests passed.', 'merge');
 
   let approved = autoMerge;
   if (!autoMerge) {
+    emit(`❓  Waiting for your approval in the terminal…`, 'prompt');
+    emit(`    Files: ${changedFiles.join(', ')}`, 'merge');
+    emit(`    Type "yes" to merge or "no" to cancel.`, 'prompt');
+
     const ans = await ask(
-      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `  Files changed: ${changedFiles.join(', ')}\n` +
-      `  Target branch: main\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `  Approve merge? (yes / no): `
+      `\n${'━'.repeat(50)}\n  Approve merge?\n  Files: ${changedFiles.join(', ')}\n  Type yes / no: `
     );
     approved = ['yes', 'y', 'approve', 'merge', 'merge it'].includes(ans.toLowerCase());
   }
 
   if (!approved) {
-    console.log('\n🚫  Merge cancelled. Changes saved locally.');
+    emit('🚫  Merge cancelled. Changes saved locally.', 'merge');
     return null;
   }
 
+  emit('🔀  [Merge Agent] Committing and pushing…', 'merge');
   const msg = `style: ${task}\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>`;
   run(`git add ${changedFiles.join(' ')}`, ROOT);
   const commit = run(`git commit -m "${msg.replace(/"/g, "'")}"`, ROOT);
-  if (!commit.ok) { console.error('Commit failed:\n', commit.output); return null; }
+  if (!commit.ok) {
+    emit('❌  Commit failed: ' + commit.output, 'error');
+    return null;
+  }
 
   const push = run('git push origin main', ROOT);
   if (push.ok) {
     const url = 'https://github.com/madhukar6143/todo_with_agent';
-    console.log(`\n✅  Pushed! View at: ${url}`);
+    emit(`✅  Pushed! View at: ${url}`, 'success');
     return url;
   } else {
-    console.error('\n❌  Push failed:\n', push.output);
+    emit('❌  Push failed: ' + push.output, 'error');
     return null;
   }
 }
@@ -153,42 +161,41 @@ async function mergeAgent(task, changedFiles, autoMerge) {
 // ── MAIN export ──────────────────────────────────────────────────────────────
 
 export async function runDevLoop(task, autoMerge = false) {
-  console.log(`\n${'━'.repeat(50)}`);
-  console.log(`🚀  Dev Loop started`);
-  console.log(`📝  Task: "${task}"`);
-  console.log(`${'━'.repeat(50)}`);
+  emit('━'.repeat(50), 'start');
+  emit(`🚀  Dev Loop started`, 'start');
+  emit(`📝  Task: "${task}"`, 'start');
+  emit('━'.repeat(50), 'start');
 
-  const changedFiles        = await uiAgent(task);
-  const { passed, report }  = await qaAgent(changedFiles);
+  try {
+    const changedFiles       = await uiAgent(task);
+    const { passed, report } = await qaAgent(changedFiles);
 
-  if (!passed) {
-    console.log('\n❌  QA failed — merge blocked. Fix errors and retry.');
-    return { success: false, report };
+    if (!passed) {
+      emit('❌  QA failed — merge blocked. Fix errors and retry.', 'error');
+      return { success: false, report };
+    }
+
+    const url = await mergeAgent(task, changedFiles, autoMerge);
+    return { success: !!url, url, report };
+  } catch (err) {
+    emit(`❌  Agent error: ${err.message}`, 'error');
+    return { success: false, error: err.message };
   }
-
-  const url = await mergeAgent(task, changedFiles, autoMerge);
-  return { success: !!url, url, report };
 }
 
-// ── Email task extractor (used by server.js) ─────────────────────────────────
+// ── Email task parser (used by server.js) ─────────────────────────────────────
 
 export function parseEmailToTask(subject, body) {
   const text = `${subject} ${body}`.toLowerCase();
-
-  // Common bug-report keywords → map to actionable tasks
   const patterns = [
-    { match: /font|color|colour|text.*color/,   task: `Fix UI issue: ${subject}` },
-    { match: /button|click|submit/,              task: `Fix button issue: ${subject}` },
-    { match: /broken|not working|error|crash/,  task: `Investigate and fix: ${subject}` },
-    { match: /slow|performance|loading/,         task: `Improve performance: ${subject}` },
-    { match: /mobile|responsive|layout/,         task: `Fix responsive layout: ${subject}` },
+    { match: /font|color|colour|text.*color/, task: `Fix UI issue: ${subject}` },
+    { match: /button|click|submit/,           task: `Fix button issue: ${subject}` },
+    { match: /broken|not working|error|crash/,task: `Investigate and fix: ${subject}` },
+    { match: /slow|performance|loading/,      task: `Improve performance: ${subject}` },
+    { match: /mobile|responsive|layout/,      task: `Fix responsive layout: ${subject}` },
   ];
-
   for (const { match, task } of patterns) {
     if (match.test(text)) return task;
   }
-
-  // Fall back to using the subject line directly if it's meaningful
-  if (subject && subject.length > 5) return subject;
-  return null;
+  return subject?.length > 5 ? subject : null;
 }

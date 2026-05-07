@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Agent Dashboard</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0f0f13; color: #e2e8f0; font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+  header { background: #1a1a2e; border-bottom: 1px solid #2d2d44; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+  header h1 { font-size: 1.2rem; font-weight: 700; color: #a78bfa; letter-spacing: 0.05em; }
+  .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 8px #22c55e; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  .layout { display: grid; grid-template-columns: 1fr 340px; gap: 16px; padding: 16px; height: calc(100vh - 57px); }
+
+  /* Log panel */
+  .log-panel { background: #12121c; border: 1px solid #2d2d44; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; }
+  .panel-title { padding: 12px 16px; font-size: 0.75rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em; border-bottom: 1px solid #2d2d44; display: flex; justify-content: space-between; align-items: center; }
+  #log { flex: 1; overflow-y: auto; padding: 12px; font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: 0.8rem; line-height: 1.7; }
+  #log::-webkit-scrollbar { width: 6px; }
+  #log::-webkit-scrollbar-track { background: #1a1a2e; }
+  #log::-webkit-scrollbar-thumb { background: #4a4a6a; border-radius: 3px; }
+
+  .log-line { display: flex; gap: 10px; padding: 2px 0; }
+  .log-time { color: #475569; flex-shrink: 0; }
+  .log-msg { flex: 1; }
+
+  /* colour classes */
+  .c-start   { color: #a78bfa; font-weight: 700; }
+  .c-ui      { color: #60a5fa; }
+  .c-qa      { color: #34d399; }
+  .c-merge   { color: #f59e0b; }
+  .c-success { color: #22c55e; font-weight: 600; }
+  .c-error   { color: #f87171; font-weight: 600; }
+  .c-info    { color: #94a3b8; }
+  .c-file    { color: #e879f9; }
+  .c-prompt  { color: #fbbf24; font-weight: 700; font-size: 0.85rem; }
+
+  /* Right panel */
+  .right { display: flex; flex-direction: column; gap: 16px; }
+
+  /* Trigger card */
+  .card { background: #12121c; border: 1px solid #2d2d44; border-radius: 12px; overflow: hidden; }
+  .card-header { padding: 12px 16px; font-size: 0.75rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em; border-bottom: 1px solid #2d2d44; }
+  .card-body { padding: 14px; }
+
+  textarea { width: 100%; background: #0f0f13; border: 1px solid #2d2d44; border-radius: 8px; color: #e2e8f0; font-family: inherit; font-size: 0.85rem; padding: 10px; resize: vertical; min-height: 70px; outline: none; }
+  textarea:focus { border-color: #7c3aed; }
+  label { font-size: 0.75rem; color: #94a3b8; display: block; margin-bottom: 6px; }
+
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 0.85rem; font-weight: 600; transition: all .15s; }
+  .btn-primary { background: #7c3aed; color: #fff; width: 100%; justify-content: center; margin-top: 10px; }
+  .btn-primary:hover { background: #6d28d9; }
+  .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-sm { background: #1e1e30; color: #94a3b8; border: 1px solid #2d2d44; font-size: 0.72rem; padding: 4px 10px; }
+  .btn-sm:hover { background: #2d2d44; color: #e2e8f0; }
+
+  /* Pipeline steps */
+  .pipeline { display: flex; flex-direction: column; gap: 8px; }
+  .step { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; border: 1px solid #2d2d44; background: #0f0f13; }
+  .step-icon { font-size: 1.1rem; width: 24px; text-align: center; }
+  .step-label { flex: 1; font-size: 0.8rem; font-weight: 600; }
+  .step-status { font-size: 0.7rem; padding: 2px 8px; border-radius: 12px; font-weight: 600; }
+  .s-idle     { color: #475569; background: #1e2a3a; }
+  .s-running  { color: #fbbf24; background: #2d1f00; animation: pulse 1s infinite; }
+  .s-done     { color: #22c55e; background: #0d2318; }
+  .s-failed   { color: #f87171; background: #2d0f0f; }
+  .s-waiting  { color: #a78bfa; background: #1a1040; animation: pulse 1.5s infinite; }
+
+  .sources { display: flex; flex-direction: column; gap: 6px; }
+  .source-badge { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 8px; border: 1px solid #2d2d44; background: #0f0f13; font-size: 0.78rem; color: #94a3b8; }
+  .source-badge span:first-child { font-size: 1rem; }
+  .source-url { font-size: 0.68rem; color: #475569; margin-top: 1px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🤖 Agent Dashboard</h1>
+  <div style="display:flex;align-items:center;gap:8px">
+    <span style="font-size:.75rem;color:#475569" id="conn-label">Connected</span>
+    <div class="status-dot" id="dot"></div>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- Left: Live log -->
+  <div class="log-panel">
+    <div class="panel-title">
+      Live Agent Log
+      <button class="btn btn-sm" onclick="clearLog()">Clear</button>
+    </div>
+    <div id="log"><div class="log-line"><span class="log-msg c-info">Waiting for tasks…</span></div></div>
+  </div>
+
+  <!-- Right: Controls + pipeline -->
+  <div class="right">
+
+    <!-- Trigger -->
+    <div class="card">
+      <div class="card-header">Send a Task</div>
+      <div class="card-body">
+        <label>Describe what you want the agent to do:</label>
+        <textarea id="task-input" placeholder="e.g. change font color to green&#10;fix the delete button on mobile&#10;make the header background dark"></textarea>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+          <input type="checkbox" id="auto-merge" style="accent-color:#7c3aed">
+          <label for="auto-merge" style="margin:0;cursor:pointer">Auto-merge (skip approval)</label>
+        </div>
+        <button class="btn btn-primary" id="run-btn" onclick="runTask()">▶ Run Agent</button>
+      </div>
+    </div>
+
+    <!-- Pipeline status -->
+    <div class="card">
+      <div class="card-header">Pipeline</div>
+      <div class="card-body">
+        <div class="pipeline">
+          <div class="step" id="step-ui">
+            <span class="step-icon">🎨</span>
+            <span class="step-label">UI Agent</span>
+            <span class="step-status s-idle" id="s-ui">idle</span>
+          </div>
+          <div class="step" id="step-qa">
+            <span class="step-icon">🧪</span>
+            <span class="step-label">QA Agent</span>
+            <span class="step-status s-idle" id="s-qa">idle</span>
+          </div>
+          <div class="step" id="step-merge">
+            <span class="step-icon">🔀</span>
+            <span class="step-label">Merge Agent</span>
+            <span class="step-status s-idle" id="s-merge">idle</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Trigger sources -->
+    <div class="card">
+      <div class="card-header">Trigger Sources</div>
+      <div class="card-body">
+        <div class="sources">
+          <div class="source-badge">
+            <span>💻</span>
+            <div>
+              <div>Terminal CLI</div>
+              <div class="source-url">node agents/cli.js "your task"</div>
+            </div>
+          </div>
+          <div class="source-badge">
+            <span>📧</span>
+            <div>
+              <div>Email Webhook</div>
+              <div class="source-url">POST /email-webhook</div>
+            </div>
+          </div>
+          <div class="source-badge">
+            <span>🐙</span>
+            <div>
+              <div>GitHub Issues</div>
+              <div class="source-url">POST /github-webhook</div>
+            </div>
+          </div>
+          <div class="source-badge">
+            <span>💬</span>
+            <div>
+              <div>Slack /agent</div>
+              <div class="source-url">POST /slack</div>
+            </div>
+          </div>
+          <div class="source-badge">
+            <span>🌐</span>
+            <div>
+              <div>HTTP / curl</div>
+              <div class="source-url">POST /run  {"task":"..."}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const log   = document.getElementById('log');
+const dot   = document.getElementById('dot');
+const connL = document.getElementById('conn-label');
+
+function ts() {
+  return new Date().toLocaleTimeString('en-GB', { hour12: false });
+}
+
+function addLog(msg, cls = 'c-info') {
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  line.innerHTML = `<span class="log-time">${ts()}</span><span class="log-msg ${cls}">${msg}</span>`;
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+}
+
+function clearLog() {
+  log.innerHTML = '';
+  addLog('Log cleared', 'c-info');
+}
+
+function setStep(step, status) {
+  const el = document.getElementById(`s-${step}`);
+  const labels = { idle:'idle', running:'running…', done:'done ✓', failed:'failed ✗', waiting:'awaiting you' };
+  el.textContent = labels[status] || status;
+  el.className = `step-status s-${status}`;
+}
+
+function resetPipeline() {
+  ['ui','qa','merge'].forEach(s => setStep(s, 'idle'));
+}
+
+// ── SSE: live log stream ──────────────────────────────────────────────────────
+function connectSSE() {
+  const es = new EventSource('/events');
+
+  es.onopen = () => {
+    dot.style.background = '#22c55e';
+    dot.style.boxShadow  = '0 0 8px #22c55e';
+    connL.textContent = 'Connected';
+  };
+
+  es.onerror = () => {
+    dot.style.background = '#f87171';
+    dot.style.boxShadow  = '0 0 8px #f87171';
+    connL.textContent = 'Reconnecting…';
+    setTimeout(connectSSE, 3000);
+    es.close();
+  };
+
+  es.addEventListener('log', (e) => {
+    const { msg, type } = JSON.parse(e.data);
+    const cls = {
+      start:'c-start', ui:'c-ui', qa:'c-qa', merge:'c-merge',
+      success:'c-success', error:'c-error', file:'c-file', prompt:'c-prompt'
+    }[type] || 'c-info';
+    addLog(msg, cls);
+
+    // Update pipeline steps
+    if (type === 'start')           { resetPipeline(); }
+    if (msg.includes('[UI Agent]')) { setStep('ui', 'running'); setStep('qa','idle'); setStep('merge','idle'); }
+    if (msg.includes('Edited:'))    { /* keep running */ }
+    if (msg.includes('[QA Agent]')) { setStep('ui', 'done'); setStep('qa','running'); }
+    if (type === 'qa' && msg.includes('PASS')) { /* keep */ }
+    if (msg.includes('[Merge Agent]')) { setStep('qa','done'); setStep('merge','waiting'); }
+    if (msg.includes('Pushed!'))    { setStep('merge','done'); document.getElementById('run-btn').disabled = false; }
+    if (msg.includes('cancelled'))  { setStep('merge','idle'); document.getElementById('run-btn').disabled = false; }
+    if (type === 'error')           { ['ui','qa','merge'].forEach(s => { if(document.getElementById(`s-${s}`).textContent.includes('running')) setStep(s,'failed'); }); document.getElementById('run-btn').disabled = false; }
+  });
+}
+
+connectSSE();
+
+// ── Send task ─────────────────────────────────────────────────────────────────
+async function runTask() {
+  const task = document.getElementById('task-input').value.trim();
+  const autoMerge = document.getElementById('auto-merge').checked;
+  if (!task) return;
+
+  document.getElementById('run-btn').disabled = true;
+  addLog(`Sending task: "${task}"`, 'c-start');
+
+  await fetch('/run', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ task, autoMerge }),
+  });
+}
+</script>
+</body>
+</html>

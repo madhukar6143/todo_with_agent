@@ -1,113 +1,94 @@
 /**
- * Agent API Server — always-running HTTP server.
- *
- * Accepts commands from:
- *   • curl / any HTTP client
- *   • Email webhooks (Postmark, SendGrid, Mailgun)
- *   • GitHub Issues webhooks
- *   • Slack slash commands
- *   • Your own dashboard / mobile app
+ * Agent API Server with live dashboard.
  *
  * Start:  node agents/server.js
+ * Then open:  http://localhost:4000
  *
- * Quick test:
+ * Trigger a task:
  *   curl -X POST http://localhost:4000/run \
  *        -H "Content-Type: application/json" \
- *        -d '{"task": "change font color to blue"}'
+ *        -d '{"task": "change font color to green"}'
  */
 
 import express from 'express';
+import path from 'path';
+import { readFileSync } from 'fs';
 import { runDevLoop, parseEmailToTask } from './runner.js';
+import { addSseClient, emit } from './logger.js';
 
 const app  = express();
 const PORT = process.env.AGENT_PORT || 4000;
+const DIR  = import.meta.dirname;
 
 app.use(express.json());
 
-// ── Health check ──────────────────────────────────────────────────────────────
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', agent: 'todo-with-agent', time: new Date().toISOString() });
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+app.get('/', (_req, res) => {
+  res.setHeader('Content-Type', 'text/html');
+  res.send(readFileSync(path.join(DIR, 'dashboard.html')));
 });
 
+// ── SSE: stream log events to dashboard ──────────────────────────────────────
+app.get('/events', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+  res.write(`event: log\ndata: ${JSON.stringify({ msg: '🔌  Dashboard connected', type: 'success' })}\n\n`);
+  addSseClient(res);
+});
+
+// ── Health ────────────────────────────────────────────────────────────────────
+app.get('/health', (_req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
+
 // ── Run any task ──────────────────────────────────────────────────────────────
-// Body: { "task": "change font to blue", "autoMerge": false }
-app.post('/run', async (req, res) => {
+app.post('/run', (req, res) => {
   const { task, autoMerge = false } = req.body;
   if (!task) return res.status(400).json({ error: '"task" is required' });
-
-  console.log(`\n📨  Task via API: "${task}"`);
-  // Respond immediately so the caller isn't blocked
   res.json({ status: 'accepted', task });
-
-  runDevLoop(task, autoMerge).catch(console.error);
+  runDevLoop(task, autoMerge).catch(e => emit('❌ ' + e.message, 'error'));
 });
 
 // ── Email webhook ─────────────────────────────────────────────────────────────
-// Point your email provider (Postmark / SendGrid / Mailgun) inbound webhook here:
-//   http://your-server:4000/email-webhook
-app.post('/email-webhook', async (req, res) => {
-  const b = req.body;
-  const subject = b.Subject  || b.subject  || b.headers?.Subject || '';
-  const text    = b.TextBody || b.text     || b.body_plain       || '';
-  const from    = b.From     || b.from     || b.sender           || 'unknown';
+app.post('/email-webhook', (req, res) => {
+  const b       = req.body;
+  const subject = b.Subject  || b.subject  || '';
+  const text    = b.TextBody || b.text     || '';
+  const from    = b.From     || b.from     || 'unknown';
 
-  console.log(`\n📧  Email from ${from} — "${subject}"`);
-
+  emit(`📧  Email from ${from} — "${subject}"`, 'info');
   const task = parseEmailToTask(subject, text);
-  if (!task) {
-    console.log('    ⚠️  No actionable task found — skipping');
-    return res.json({ status: 'skipped', reason: 'no actionable task found' });
-  }
+  if (!task) return res.json({ status: 'skipped' });
 
-  console.log(`    🎯  Task: "${task}"`);
+  emit(`  🎯  Task extracted: "${task}"`, 'ui');
   res.json({ status: 'accepted', task });
-  runDevLoop(task, false).catch(console.error);
+  runDevLoop(task, false).catch(e => emit('❌ ' + e.message, 'error'));
 });
 
 // ── GitHub Issues webhook ─────────────────────────────────────────────────────
-// GitHub repo → Settings → Webhooks → URL: http://your-server:4000/github-webhook
-// Content type: application/json  |  Events: Issues
-app.post('/github-webhook', async (req, res) => {
+app.post('/github-webhook', (req, res) => {
   const { action, issue } = req.body;
   if (action !== 'opened') return res.json({ status: 'ignored' });
 
   const labels = (issue?.labels || []).map(l => l.name);
-  if (!labels.includes('agent-task') && !labels.includes('bug')) {
-    return res.json({ status: 'ignored', reason: 'needs label: agent-task or bug' });
-  }
+  if (!labels.includes('agent-task') && !labels.includes('bug'))
+    return res.json({ status: 'ignored', reason: 'label "bug" or "agent-task" required' });
 
   const task = `${issue.title}. ${(issue.body || '').slice(0, 200)}`;
-  console.log(`\n🐙  GitHub Issue #${issue.number}: "${issue.title}"`);
+  emit(`🐙  GitHub Issue #${issue.number}: "${issue.title}"`, 'info');
   res.json({ status: 'accepted', task });
-  runDevLoop(task, false).catch(console.error);
+  runDevLoop(task, false).catch(e => emit('❌ ' + e.message, 'error'));
 });
 
-// ── Slack slash command ────────────────────────────────────────────────────────
-// In Slack app settings → Slash Commands → Request URL: http://your-server:4000/slack
-// Command: /agent    Usage: /agent change font to blue
-app.post('/slack', async (req, res) => {
+// ── Slack slash command ───────────────────────────────────────────────────────
+app.post('/slack', (req, res) => {
   const { text, user_name } = req.body;
-  if (!text) return res.json({ text: 'Usage: /agent <task description>' });
-
-  console.log(`\n💬  Slack from @${user_name}: "${text}"`);
-  res.json({ text: `✅ Agent started on: "${text}"\nCheck server logs for progress.` });
-  runDevLoop(text, false).catch(console.error);
+  if (!text) return res.json({ text: 'Usage: /agent <task>' });
+  emit(`💬  Slack from @${user_name}: "${text}"`, 'info');
+  res.json({ text: `✅ Agent started on: "${text}"` });
+  runDevLoop(text, false).catch(e => emit('❌ ' + e.message, 'error'));
 });
 
 app.listen(PORT, () => {
-  console.log(`
-🤖  Agent Server running on http://localhost:${PORT}
-
-  Endpoints:
-    GET  /health
-    POST /run             ← { "task": "..." }  from curl / any app
-    POST /email-webhook   ← Postmark / SendGrid / Mailgun inbound
-    POST /github-webhook  ← GitHub Issues (labeled "bug" or "agent-task")
-    POST /slack           ← Slack slash command /agent
-
-  Quick test (open a new terminal):
-    curl -X POST http://localhost:${PORT}/run \\
-         -H "Content-Type: application/json" \\
-         -d '{"task":"change font color to blue"}'
-`);
+  emit(`🤖  Agent server running — open dashboard: http://localhost:${PORT}`, 'success');
 });
