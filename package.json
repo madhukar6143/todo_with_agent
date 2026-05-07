@@ -1,0 +1,18 @@
+{
+  "name": "todo-with-agent",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Full-stack Todo app with autonomous agentic dev loop",
+  "scripts": {
+    "agent": "node agents/cli.js",
+    "agent:server": "node agents/server.js",
+    "dev:backend": "cd backend && npm start",
+    "dev:frontend": "cd frontend && npm run dev",
+    "test:backend": "cd backend && npm test",
+    "test:frontend": "cd frontend && npm test"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.52.0",
+    "express": "^4.18.2"
+  }
+}

@@ -23,8 +23,8 @@ export default function App() {
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50 px-4 py-12">
       <div className="mx-auto w-full max-w-lg">
         <header className="mb-8 text-center">
-          <h1 className="text-4xl font-bold text-indigo-700 tracking-tight">Todo</h1>
-          <p className="mt-1 text-sm text-gray-500">Stay organised, get things done.</p>
+          <h1 className="text-4xl font-bold text-red-600 tracking-tight">Todo</h1>
+          <p className="mt-1 text-sm text-red-400">Stay organised, get things done.</p>
         </header>
 
         <div className="rounded-2xl bg-white p-6 shadow-lg">

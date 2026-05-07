@@ -10,7 +10,7 @@ export function TodoItem({ todo, onToggle, onDelete }) {
       />
       <span
         className={`flex-1 text-sm ${
-          todo.completed ? 'text-gray-400 line-through' : 'text-gray-800'
+          todo.completed ? 'text-red-200 line-through' : 'text-red-700'
         }`}
       >
         {todo.title}
