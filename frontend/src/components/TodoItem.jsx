@@ -6,11 +6,11 @@ export function TodoItem({ todo, onToggle, onDelete }) {
         checked={todo.completed === 1}
         onChange={() => onToggle(todo.id, todo.completed === 1)}
         aria-label={`Mark "${todo.title}" as ${todo.completed ? 'incomplete' : 'complete'}`}
-        className="h-4 w-4 cursor-pointer rounded accent-indigo-600"
+        className="h-4 w-4 cursor-pointer rounded accent-blue-600"
       />
       <span
         className={`flex-1 text-sm ${
-          todo.completed ? 'text-red-200 line-through' : 'text-red-700'
+          todo.completed ? 'text-blue-200 line-through' : 'text-blue-700'
         }`}
       >
         {todo.title}
