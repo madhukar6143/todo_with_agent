@@ -7,8 +7,8 @@ import Anthropic from '@anthropic-ai/sdk';
 import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as readline from 'readline';
 import { emit } from './logger.js';
+import { waitForApproval } from './approval.js';
 
 const client = new Anthropic();
 const ROOT   = path.resolve(import.meta.dirname, '..');
@@ -31,13 +31,6 @@ function run(cmd, cwd = ROOT) {
   } catch (e) {
     return { ok: false, output: (e.stdout || '') + '\n' + (e.stderr || '') };
   }
-}
-
-function ask(question) {
-  return new Promise((resolve) => {
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    rl.question(question, (ans) => { rl.close(); resolve(ans.trim()); });
-  });
 }
 
 async function claude(system, user) {
@@ -123,14 +116,10 @@ async function mergeAgent(task, changedFiles, autoMerge) {
 
   let approved = autoMerge;
   if (!autoMerge) {
-    emit(`❓  Waiting for your approval in the terminal…`, 'prompt');
-    emit(`    Files: ${changedFiles.join(', ')}`, 'merge');
-    emit(`    Type "yes" to merge or "no" to cancel.`, 'prompt');
-
-    const ans = await ask(
-      `\n${'━'.repeat(50)}\n  Approve merge?\n  Files: ${changedFiles.join(', ')}\n  Type yes / no: `
-    );
-    approved = ['yes', 'y', 'approve', 'merge', 'merge it'].includes(ans.toLowerCase());
+    emit(`    Files changed: ${changedFiles.join(', ')}`, 'merge');
+    emit(`APPROVAL_REQUIRED`, 'prompt');
+    emit(`👆  Click Approve or Reject in the dashboard (or server UI).`, 'prompt');
+    approved = await waitForApproval();
   }
 
   if (!approved) {

@@ -15,6 +15,7 @@ import path from 'path';
 import { readFileSync } from 'fs';
 import { runDevLoop, parseEmailToTask } from './runner.js';
 import { addSseClient, emit } from './logger.js';
+import { approve, reject, isPending } from './approval.js';
 
 const app  = express();
 const PORT = process.env.AGENT_PORT || 4000;
@@ -40,6 +41,21 @@ app.get('/events', (req, res) => {
 
 // ── Health ────────────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
+
+// ── Approval endpoints (called by dashboard buttons) ──────────────────────────
+app.post('/approve', (_req, res) => {
+  if (!isPending()) return res.status(409).json({ error: 'no approval pending' });
+  emit('✅  Approved via dashboard — merging…', 'success');
+  approve();
+  res.json({ status: 'approved' });
+});
+
+app.post('/reject', (_req, res) => {
+  if (!isPending()) return res.status(409).json({ error: 'no approval pending' });
+  emit('🚫  Rejected via dashboard — merge cancelled.', 'merge');
+  reject();
+  res.json({ status: 'rejected' });
+});
 
 // ── Run any task ──────────────────────────────────────────────────────────────
 app.post('/run', (req, res) => {

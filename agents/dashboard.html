@@ -57,6 +57,17 @@
   .btn-sm { background: #1e1e30; color: #94a3b8; border: 1px solid #2d2d44; font-size: 0.72rem; padding: 4px 10px; }
   .btn-sm:hover { background: #2d2d44; color: #e2e8f0; }
 
+  /* Approval banner */
+  #approval-banner { display:none; background: #1a0f00; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; }
+  #approval-banner.visible { display: block; animation: glow 1.5s infinite; }
+  @keyframes glow { 0%,100%{box-shadow:0 0 0 rgba(245,158,11,0)} 50%{box-shadow:0 0 16px rgba(245,158,11,.4)} }
+  .approval-title { font-size: 0.85rem; font-weight: 700; color: #f59e0b; margin-bottom: 12px; }
+  .approval-btns { display: flex; gap: 8px; }
+  .btn-approve { background: #15803d; color: #fff; flex: 1; justify-content: center; }
+  .btn-approve:hover { background: #166534; }
+  .btn-reject  { background: #991b1b; color: #fff; flex: 1; justify-content: center; }
+  .btn-reject:hover  { background: #7f1d1d; }
+
   /* Pipeline steps */
   .pipeline { display: flex; flex-direction: column; gap: 8px; }
   .step { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; border: 1px solid #2d2d44; background: #0f0f13; }
@@ -110,6 +121,15 @@
           <label for="auto-merge" style="margin:0;cursor:pointer">Auto-merge (skip approval)</label>
         </div>
         <button class="btn btn-primary" id="run-btn" onclick="runTask()">▶ Run Agent</button>
+      </div>
+    </div>
+
+    <!-- Approval banner (shown when merge agent waits) -->
+    <div id="approval-banner">
+      <div class="approval-title">🔀 Merge Agent is waiting for your decision</div>
+      <div class="approval-btns">
+        <button class="btn btn-approve" onclick="decide('approve')">✅ Approve &amp; Merge</button>
+        <button class="btn btn-reject"  onclick="decide('reject')">🚫 Reject</button>
       </div>
     </div>
 
@@ -250,6 +270,7 @@ function connectSSE() {
     if (msg.includes('[QA Agent]')) { setStep('ui', 'done'); setStep('qa','running'); }
     if (type === 'qa' && msg.includes('PASS')) { /* keep */ }
     if (msg.includes('[Merge Agent]')) { setStep('qa','done'); setStep('merge','waiting'); }
+    if (type === 'prompt' && msg.includes('APPROVAL_REQUIRED')) { showApproval(); }
     if (msg.includes('Pushed!'))    { setStep('merge','done'); document.getElementById('run-btn').disabled = false; }
     if (msg.includes('cancelled'))  { setStep('merge','idle'); document.getElementById('run-btn').disabled = false; }
     if (type === 'error')           { ['ui','qa','merge'].forEach(s => { if(document.getElementById(`s-${s}`).textContent.includes('running')) setStep(s,'failed'); }); document.getElementById('run-btn').disabled = false; }
@@ -257,6 +278,17 @@ function connectSSE() {
 }
 
 connectSSE();
+
+// ── Approve / Reject ──────────────────────────────────────────────────────────
+async function decide(action) {
+  document.getElementById('approval-banner').classList.remove('visible');
+  await fetch(`/${action}`, { method: 'POST' });
+  setStep('merge', action === 'approve' ? 'running' : 'idle');
+}
+
+function showApproval() {
+  document.getElementById('approval-banner').classList.add('visible');
+}
 
 // ── Send task ─────────────────────────────────────────────────────────────────
 async function runTask() {
