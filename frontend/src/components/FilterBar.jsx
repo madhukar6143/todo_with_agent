@@ -11,15 +11,15 @@ export function FilterBar({ current, onChange, counts }) {
             aria-pressed={current === f}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
               current === f
-                ? 'bg-black text-white'
-                : 'text-gray-500 hover:bg-gray-100'
+                ? 'bg-blue-900 text-white'
+                : 'text-blue-700 hover:bg-blue-50'
             }`}
           >
             {f}
           </button>
         ))}
       </div>
-      <span className="text-xs text-gray-400">
+      <span className="text-xs text-blue-700">
         {counts.active} left
       </span>
     </div>

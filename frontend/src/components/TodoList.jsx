@@ -3,7 +3,7 @@ import { TodoItem } from './TodoItem';
 export function TodoList({ todos, onToggle, onDelete }) {
   if (todos.length === 0) {
     return (
-      <p className="py-10 text-center text-sm text-gray-400">
+      <p className="py-10 text-center text-sm text-blue-700">
         Nothing here yet — add your first task above!
       </p>
     );
