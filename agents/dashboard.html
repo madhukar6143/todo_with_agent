@@ -270,7 +270,7 @@ function connectSSE() {
     if (msg.includes('[QA Agent]')) { setStep('ui', 'done'); setStep('qa','running'); }
     if (type === 'qa' && msg.includes('PASS')) { /* keep */ }
     if (msg.includes('[Merge Agent]')) { setStep('qa','done'); setStep('merge','waiting'); }
-    if (type === 'prompt' && msg.includes('APPROVAL_REQUIRED')) { showApproval(); }
+    if (type === 'prompt' && msg.includes('APPROVAL_REQUIRED')) { showApproval(); document.getElementById('run-btn').disabled = false; }
     if (msg.includes('Pushed!'))    { setStep('merge','done'); document.getElementById('run-btn').disabled = false; }
     if (msg.includes('cancelled'))  { setStep('merge','idle'); document.getElementById('run-btn').disabled = false; }
     if (type === 'error')           { ['ui','qa','merge'].forEach(s => { if(document.getElementById(`s-${s}`).textContent.includes('running')) setStep(s,'failed'); }); document.getElementById('run-btn').disabled = false; }

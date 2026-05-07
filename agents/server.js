@@ -15,7 +15,7 @@ import path from 'path';
 import { readFileSync } from 'fs';
 import { runDevLoop, parseEmailToTask } from './runner.js';
 import { addSseClient, emit } from './logger.js';
-import { approve, reject, isPending } from './approval.js';
+import { approve, reject, isPending, waitForApproval } from './approval.js';
 
 const app  = express();
 const PORT = process.env.AGENT_PORT || 4000;
@@ -62,7 +62,7 @@ app.post('/run', (req, res) => {
   const { task, autoMerge = false } = req.body;
   if (!task) return res.status(400).json({ error: '"task" is required' });
   res.json({ status: 'accepted', task });
-  runDevLoop(task, autoMerge).catch(e => emit('❌ ' + e.message, 'error'));
+  runDevLoop(task, autoMerge, waitForApproval).catch(e => emit('❌ ' + e.message, 'error'));
 });
 
 // ── Email webhook ─────────────────────────────────────────────────────────────
@@ -78,7 +78,7 @@ app.post('/email-webhook', (req, res) => {
 
   emit(`  🎯  Task extracted: "${task}"`, 'ui');
   res.json({ status: 'accepted', task });
-  runDevLoop(task, false).catch(e => emit('❌ ' + e.message, 'error'));
+  runDevLoop(task, false, waitForApproval).catch(e => emit('❌ ' + e.message, 'error'));
 });
 
 // ── GitHub Issues webhook ─────────────────────────────────────────────────────
@@ -93,7 +93,7 @@ app.post('/github-webhook', (req, res) => {
   const task = `${issue.title}. ${(issue.body || '').slice(0, 200)}`;
   emit(`🐙  GitHub Issue #${issue.number}: "${issue.title}"`, 'info');
   res.json({ status: 'accepted', task });
-  runDevLoop(task, false).catch(e => emit('❌ ' + e.message, 'error'));
+  runDevLoop(task, false, waitForApproval).catch(e => emit('❌ ' + e.message, 'error'));
 });
 
 // ── Slack slash command ───────────────────────────────────────────────────────
@@ -102,7 +102,7 @@ app.post('/slack', (req, res) => {
   if (!text) return res.json({ text: 'Usage: /agent <task>' });
   emit(`💬  Slack from @${user_name}: "${text}"`, 'info');
   res.json({ text: `✅ Agent started on: "${text}"` });
-  runDevLoop(text, false).catch(e => emit('❌ ' + e.message, 'error'));
+  runDevLoop(text, false, waitForApproval).catch(e => emit('❌ ' + e.message, 'error'));
 });
 
 app.listen(PORT, () => {

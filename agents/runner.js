@@ -7,8 +7,8 @@ import Anthropic from '@anthropic-ai/sdk';
 import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as readline from 'readline';
 import { emit } from './logger.js';
-import { waitForApproval } from './approval.js';
 
 const client = new Anthropic();
 const ROOT   = path.resolve(import.meta.dirname, '..');
@@ -111,15 +111,14 @@ async function qaAgent(changedFiles) {
 
 // ── AGENT 3: MERGE ───────────────────────────────────────────────────────────
 
-async function mergeAgent(task, changedFiles, autoMerge) {
+async function mergeAgent(task, changedFiles, autoMerge, approvalFn) {
   emit('🔀  [Merge Agent] All tests passed.', 'merge');
 
   let approved = autoMerge;
   if (!autoMerge) {
     emit(`    Files changed: ${changedFiles.join(', ')}`, 'merge');
     emit(`APPROVAL_REQUIRED`, 'prompt');
-    emit(`👆  Click Approve or Reject in the dashboard (or server UI).`, 'prompt');
-    approved = await waitForApproval();
+    approved = await approvalFn();
   }
 
   if (!approved) {
@@ -128,8 +127,16 @@ async function mergeAgent(task, changedFiles, autoMerge) {
   }
 
   emit('🔀  [Merge Agent] Committing and pushing…', 'merge');
-  const msg = `style: ${task}\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>`;
+
+  // Guard: nothing to commit means the UI Agent made no real changes
   run(`git add ${changedFiles.join(' ')}`, ROOT);
+  const diff = run('git diff --cached --quiet', ROOT);
+  if (diff.ok) {
+    emit('⚠️  No file changes detected — nothing to commit.', 'merge');
+    return null;
+  }
+
+  const msg = `style: ${task}\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>`;
   const commit = run(`git commit -m "${msg.replace(/"/g, "'")}"`, ROOT);
   if (!commit.ok) {
     emit('❌  Commit failed: ' + commit.output, 'error');
@@ -149,7 +156,18 @@ async function mergeAgent(task, changedFiles, autoMerge) {
 
 // ── MAIN export ──────────────────────────────────────────────────────────────
 
-export async function runDevLoop(task, autoMerge = false) {
+// Default approval: readline prompt in the terminal (used by cli.js)
+function readlineApproval() {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    rl.question('\n  Approve merge? (yes / no): ', (ans) => {
+      rl.close();
+      resolve(['yes', 'y', 'approve', 'merge'].includes(ans.trim().toLowerCase()));
+    });
+  });
+}
+
+export async function runDevLoop(task, autoMerge = false, approvalFn = readlineApproval) {
   emit('━'.repeat(50), 'start');
   emit(`🚀  Dev Loop started`, 'start');
   emit(`📝  Task: "${task}"`, 'start');
@@ -164,7 +182,7 @@ export async function runDevLoop(task, autoMerge = false) {
       return { success: false, report };
     }
 
-    const url = await mergeAgent(task, changedFiles, autoMerge);
+    const url = await mergeAgent(task, changedFiles, autoMerge, approvalFn);
     return { success: !!url, url, report };
   } catch (err) {
     emit(`❌  Agent error: ${err.message}`, 'error');
