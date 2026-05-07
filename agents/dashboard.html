@@ -1,202 +1,191 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Agent Dashboard</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #0f0f13; color: #e2e8f0; font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0f0f13;color:#e2e8f0;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;overflow:hidden}
 
-  header { background: #1a1a2e; border-bottom: 1px solid #2d2d44; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
-  header h1 { font-size: 1.2rem; font-weight: 700; color: #a78bfa; letter-spacing: 0.05em; }
-  .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 8px #22c55e; animation: pulse 2s infinite; }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  header{background:#1a1a2e;border-bottom:1px solid #2d2d44;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+  header h1{font-size:1rem;font-weight:700;color:#a78bfa;letter-spacing:.05em;white-space:nowrap}
+  .dot{width:9px;height:9px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px #22c55e;animation:pulse 2s infinite;flex-shrink:0}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 
-  .layout { display: grid; grid-template-columns: 1fr 340px; gap: 16px; padding: 16px; height: calc(100vh - 57px); }
+  /* 3-column layout */
+  .layout{display:grid;grid-template-columns:1fr 1.4fr 300px;gap:10px;padding:10px;height:calc(100vh - 49px)}
+
+  /* shared panel */
+  .panel{background:#12121c;border:1px solid #2d2d44;border-radius:10px;display:flex;flex-direction:column;overflow:hidden;min-height:0}
+  .panel-title{padding:9px 14px;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.1em;border-bottom:1px solid #2d2d44;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
 
   /* Log panel */
-  .log-panel { background: #12121c; border: 1px solid #2d2d44; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; }
-  .panel-title { padding: 12px 16px; font-size: 0.75rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em; border-bottom: 1px solid #2d2d44; display: flex; justify-content: space-between; align-items: center; }
-  #log { flex: 1; overflow-y: auto; padding: 12px; font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: 0.8rem; line-height: 1.7; }
-  #log::-webkit-scrollbar { width: 6px; }
-  #log::-webkit-scrollbar-track { background: #1a1a2e; }
-  #log::-webkit-scrollbar-thumb { background: #4a4a6a; border-radius: 3px; }
+  #log{flex:1;overflow-y:auto;padding:10px 12px;font-family:'Cascadia Code','Fira Code',monospace;font-size:.75rem;line-height:1.7}
+  #log::-webkit-scrollbar{width:4px}
+  #log::-webkit-scrollbar-track{background:#1a1a2e}
+  #log::-webkit-scrollbar-thumb{background:#3a3a5a;border-radius:2px}
+  .log-line{display:flex;gap:8px;padding:1px 0}
+  .log-time{color:#334155;flex-shrink:0;font-size:.68rem;padding-top:2px}
+  .log-msg{flex:1;white-space:pre-wrap;word-break:break-word}
+  .c-start{color:#a78bfa;font-weight:700}.c-ui{color:#60a5fa}.c-qa{color:#34d399}
+  .c-merge{color:#f59e0b}.c-success{color:#22c55e;font-weight:600}.c-error{color:#f87171;font-weight:600}
+  .c-file{color:#e879f9}.c-prompt{color:#fbbf24;font-weight:700}.c-info{color:#475569}
 
-  .log-line { display: flex; gap: 10px; padding: 2px 0; }
-  .log-time { color: #475569; flex-shrink: 0; }
-  .log-msg { flex: 1; }
+  /* Inspector panel */
+  #inspector{flex:1;overflow-y:auto;padding:8px}
+  #inspector::-webkit-scrollbar{width:4px}
+  #inspector::-webkit-scrollbar-track{background:#1a1a2e}
+  #inspector::-webkit-scrollbar-thumb{background:#3a3a5a;border-radius:2px}
 
-  /* colour classes */
-  .c-start   { color: #a78bfa; font-weight: 700; }
-  .c-ui      { color: #60a5fa; }
-  .c-qa      { color: #34d399; }
-  .c-merge   { color: #f59e0b; }
-  .c-success { color: #22c55e; font-weight: 600; }
-  .c-error   { color: #f87171; font-weight: 600; }
-  .c-info    { color: #94a3b8; }
-  .c-file    { color: #e879f9; }
-  .c-prompt  { color: #fbbf24; font-weight: 700; font-size: 0.85rem; }
+  .inspect-card{background:#0d0d16;border:1px solid #2d2d44;border-radius:8px;margin-bottom:8px;overflow:hidden}
+  .inspect-card.ui-agent    .ic-header{border-left:3px solid #60a5fa}
+  .inspect-card.qa-agent    .ic-header{border-left:3px solid #34d399}
+  .inspect-card.merge-agent .ic-header{border-left:3px solid #f59e0b}
 
-  /* Right panel */
-  .right { display: flex; flex-direction: column; gap: 16px; }
+  .ic-header{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;cursor:pointer;user-select:none;gap:8px}
+  .ic-header:hover{background:#16162a}
+  .ic-title{font-size:.75rem;font-weight:600;color:#cbd5e1;flex:1}
+  .ic-meta{font-size:.65rem;color:#475569;white-space:nowrap}
+  .ic-chevron{color:#475569;font-size:.75rem;transition:transform .2s;flex-shrink:0}
+  .ic-header.open .ic-chevron{transform:rotate(180deg)}
 
-  /* Trigger card */
-  .card { background: #12121c; border: 1px solid #2d2d44; border-radius: 12px; overflow: hidden; }
-  .card-header { padding: 12px 16px; font-size: 0.75rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em; border-bottom: 1px solid #2d2d44; }
-  .card-body { padding: 14px; }
+  .ic-body{display:none;border-top:1px solid #1e1e30;padding:10px 12px}
+  .ic-body.open{display:block}
+  .ic-body pre{font-family:'Cascadia Code','Fira Code',monospace;font-size:.7rem;line-height:1.6;white-space:pre-wrap;word-break:break-word;color:#94a3b8;max-height:320px;overflow-y:auto}
+  .ic-body pre::-webkit-scrollbar{width:3px}
+  .ic-body pre::-webkit-scrollbar-thumb{background:#3a3a5a;border-radius:2px}
 
-  textarea { width: 100%; background: #0f0f13; border: 1px solid #2d2d44; border-radius: 8px; color: #e2e8f0; font-family: inherit; font-size: 0.85rem; padding: 10px; resize: vertical; min-height: 70px; outline: none; }
-  textarea:focus { border-color: #7c3aed; }
-  label { font-size: 0.75rem; color: #94a3b8; display: block; margin-bottom: 6px; }
+  /* diff colours */
+  .diff-add{color:#4ade80}
+  .diff-rem{color:#f87171}
 
-  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 0.85rem; font-weight: 600; transition: all .15s; }
-  .btn-primary { background: #7c3aed; color: #fff; width: 100%; justify-content: center; margin-top: 10px; }
-  .btn-primary:hover { background: #6d28d9; }
-  .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
-  .btn-sm { background: #1e1e30; color: #94a3b8; border: 1px solid #2d2d44; font-size: 0.72rem; padding: 4px 10px; }
-  .btn-sm:hover { background: #2d2d44; color: #e2e8f0; }
+  /* Right controls */
+  .right{display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+  .right::-webkit-scrollbar{width:4px}
+  .right::-webkit-scrollbar-thumb{background:#3a3a5a;border-radius:2px}
 
-  /* Approval banner */
-  #approval-banner { display:none; background: #1a0f00; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; }
-  #approval-banner.visible { display: block; animation: glow 1.5s infinite; }
-  @keyframes glow { 0%,100%{box-shadow:0 0 0 rgba(245,158,11,0)} 50%{box-shadow:0 0 16px rgba(245,158,11,.4)} }
-  .approval-title { font-size: 0.85rem; font-weight: 700; color: #f59e0b; margin-bottom: 12px; }
-  .approval-btns { display: flex; gap: 8px; }
-  .btn-approve { background: #15803d; color: #fff; flex: 1; justify-content: center; }
-  .btn-approve:hover { background: #166534; }
-  .btn-reject  { background: #991b1b; color: #fff; flex: 1; justify-content: center; }
-  .btn-reject:hover  { background: #7f1d1d; }
+  .card{background:#12121c;border:1px solid #2d2d44;border-radius:10px;overflow:hidden;flex-shrink:0}
+  .card-header{padding:9px 14px;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.1em;border-bottom:1px solid #2d2d44}
+  .card-body{padding:12px}
 
-  /* Pipeline steps */
-  .pipeline { display: flex; flex-direction: column; gap: 8px; }
-  .step { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; border: 1px solid #2d2d44; background: #0f0f13; }
-  .step-icon { font-size: 1.1rem; width: 24px; text-align: center; }
-  .step-label { flex: 1; font-size: 0.8rem; font-weight: 600; }
-  .step-status { font-size: 0.7rem; padding: 2px 8px; border-radius: 12px; font-weight: 600; }
-  .s-idle     { color: #475569; background: #1e2a3a; }
-  .s-running  { color: #fbbf24; background: #2d1f00; animation: pulse 1s infinite; }
-  .s-done     { color: #22c55e; background: #0d2318; }
-  .s-failed   { color: #f87171; background: #2d0f0f; }
-  .s-waiting  { color: #a78bfa; background: #1a1040; animation: pulse 1.5s infinite; }
+  textarea{width:100%;background:#0a0a12;border:1px solid #2d2d44;border-radius:7px;color:#e2e8f0;font-family:inherit;font-size:.8rem;padding:8px 10px;resize:vertical;min-height:64px;outline:none}
+  textarea:focus{border-color:#7c3aed}
+  label{font-size:.72rem;color:#64748b;display:block;margin-bottom:5px}
 
-  .sources { display: flex; flex-direction: column; gap: 6px; }
-  .source-badge { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 8px; border: 1px solid #2d2d44; background: #0f0f13; font-size: 0.78rem; color: #94a3b8; }
-  .source-badge span:first-child { font-size: 1rem; }
-  .source-url { font-size: 0.68rem; color: #475569; margin-top: 1px; }
+  .btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:7px;border:none;cursor:pointer;font-size:.8rem;font-weight:600;transition:all .15s}
+  .btn-primary{background:#7c3aed;color:#fff;width:100%;justify-content:center;margin-top:8px}
+  .btn-primary:hover{background:#6d28d9}
+  .btn-primary:disabled{opacity:.45;cursor:not-allowed}
+  .btn-sm{background:#1e1e30;color:#64748b;border:1px solid #2d2d44;font-size:.68rem;padding:3px 8px}
+  .btn-sm:hover{background:#2d2d44;color:#e2e8f0}
+
+  /* Pipeline */
+  .pipeline{display:flex;flex-direction:column;gap:6px}
+  .step{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:7px;border:1px solid #2d2d44;background:#0a0a12}
+  .step-icon{font-size:1rem;width:20px;text-align:center}
+  .step-label{flex:1;font-size:.78rem;font-weight:600}
+  .step-status{font-size:.65rem;padding:2px 7px;border-radius:10px;font-weight:700}
+  .s-idle   {color:#334155;background:#0f1923}
+  .s-running{color:#fbbf24;background:#2d1f00;animation:pulse 1s infinite}
+  .s-done   {color:#22c55e;background:#0d2318}
+  .s-failed {color:#f87171;background:#2d0f0f}
+  .s-waiting{color:#a78bfa;background:#1a1040;animation:pulse 1.5s infinite}
+
+  /* Approval */
+  #approval-banner{display:none;background:#140f00;border:1px solid #f59e0b;border-radius:9px;padding:12px;flex-shrink:0}
+  #approval-banner.visible{display:block;animation:glow 1.5s infinite}
+  @keyframes glow{0%,100%{box-shadow:0 0 0 rgba(245,158,11,0)}50%{box-shadow:0 0 14px rgba(245,158,11,.35)}}
+  .approval-title{font-size:.8rem;font-weight:700;color:#f59e0b;margin-bottom:10px}
+  .approval-btns{display:flex;gap:7px}
+  .btn-approve{background:#15803d;color:#fff;flex:1;justify-content:center}
+  .btn-approve:hover{background:#166534}
+  .btn-reject{background:#991b1b;color:#fff;flex:1;justify-content:center}
+  .btn-reject:hover{background:#7f1d1d}
+
+  .sources{display:flex;flex-direction:column;gap:5px}
+  .source-badge{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;border:1px solid #1e1e30;background:#0a0a12;font-size:.73rem;color:#64748b}
+  .source-url{font-size:.64rem;color:#334155;margin-top:1px;font-family:monospace}
 </style>
 </head>
 <body>
 
 <header>
   <h1>🤖 Agent Dashboard</h1>
-  <div style="display:flex;align-items:center;gap:8px">
-    <span style="font-size:.75rem;color:#475569" id="conn-label">Connected</span>
-    <div class="status-dot" id="dot"></div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span style="font-size:.72rem;color:#475569" id="conn-label">Connected</span>
+    <div class="dot" id="dot"></div>
   </div>
 </header>
 
 <div class="layout">
 
-  <!-- Left: Live log -->
-  <div class="log-panel">
+  <!-- Col 1: Live log -->
+  <div class="panel">
     <div class="panel-title">
-      Live Agent Log
+      Live Log
       <button class="btn btn-sm" onclick="clearLog()">Clear</button>
     </div>
     <div id="log"><div class="log-line"><span class="log-msg c-info">Waiting for tasks…</span></div></div>
   </div>
 
-  <!-- Right: Controls + pipeline -->
+  <!-- Col 2: Agent Inspector -->
+  <div class="panel">
+    <div class="panel-title">
+      Agent Inspector
+      <button class="btn btn-sm" onclick="clearInspector()">Clear</button>
+    </div>
+    <div id="inspector"><p style="padding:12px;font-size:.75rem;color:#334155">Run a task to see prompts, responses, diffs, and test output here.</p></div>
+  </div>
+
+  <!-- Col 3: Controls -->
   <div class="right">
+
+    <!-- Approval -->
+    <div id="approval-banner">
+      <div class="approval-title">🔀 Approve merge?</div>
+      <div class="approval-btns">
+        <button class="btn btn-approve" onclick="decide('approve')">✅ Approve</button>
+        <button class="btn btn-reject"  onclick="decide('reject')">🚫 Reject</button>
+      </div>
+    </div>
 
     <!-- Trigger -->
     <div class="card">
       <div class="card-header">Send a Task</div>
       <div class="card-body">
-        <label>Describe what you want the agent to do:</label>
-        <textarea id="task-input" placeholder="e.g. change font color to green&#10;fix the delete button on mobile&#10;make the header background dark"></textarea>
-        <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+        <label>What should the agent do?</label>
+        <textarea id="task-input" placeholder="e.g. change Add button text to Add Item&#10;make the header background dark&#10;fix delete icon size on mobile"></textarea>
+        <div style="display:flex;align-items:center;gap:7px;margin-top:7px">
           <input type="checkbox" id="auto-merge" style="accent-color:#7c3aed">
-          <label for="auto-merge" style="margin:0;cursor:pointer">Auto-merge (skip approval)</label>
+          <label for="auto-merge" style="margin:0;cursor:pointer">Auto-merge</label>
         </div>
         <button class="btn btn-primary" id="run-btn" onclick="runTask()">▶ Run Agent</button>
       </div>
     </div>
 
-    <!-- Approval banner (shown when merge agent waits) -->
-    <div id="approval-banner">
-      <div class="approval-title">🔀 Merge Agent is waiting for your decision</div>
-      <div class="approval-btns">
-        <button class="btn btn-approve" onclick="decide('approve')">✅ Approve &amp; Merge</button>
-        <button class="btn btn-reject"  onclick="decide('reject')">🚫 Reject</button>
-      </div>
-    </div>
-
-    <!-- Pipeline status -->
+    <!-- Pipeline -->
     <div class="card">
       <div class="card-header">Pipeline</div>
       <div class="card-body">
         <div class="pipeline">
-          <div class="step" id="step-ui">
-            <span class="step-icon">🎨</span>
-            <span class="step-label">UI Agent</span>
-            <span class="step-status s-idle" id="s-ui">idle</span>
-          </div>
-          <div class="step" id="step-qa">
-            <span class="step-icon">🧪</span>
-            <span class="step-label">QA Agent</span>
-            <span class="step-status s-idle" id="s-qa">idle</span>
-          </div>
-          <div class="step" id="step-merge">
-            <span class="step-icon">🔀</span>
-            <span class="step-label">Merge Agent</span>
-            <span class="step-status s-idle" id="s-merge">idle</span>
-          </div>
+          <div class="step"><span class="step-icon">🎨</span><span class="step-label">UI Agent</span><span class="step-status s-idle" id="s-ui">idle</span></div>
+          <div class="step"><span class="step-icon">🧪</span><span class="step-label">QA Agent</span><span class="step-status s-idle" id="s-qa">idle</span></div>
+          <div class="step"><span class="step-icon">🔀</span><span class="step-label">Merge Agent</span><span class="step-status s-idle" id="s-merge">idle</span></div>
         </div>
       </div>
     </div>
 
-    <!-- Trigger sources -->
+    <!-- Sources -->
     <div class="card">
       <div class="card-header">Trigger Sources</div>
       <div class="card-body">
         <div class="sources">
-          <div class="source-badge">
-            <span>💻</span>
-            <div>
-              <div>Terminal CLI</div>
-              <div class="source-url">node agents/cli.js "your task"</div>
-            </div>
-          </div>
-          <div class="source-badge">
-            <span>📧</span>
-            <div>
-              <div>Email Webhook</div>
-              <div class="source-url">POST /email-webhook</div>
-            </div>
-          </div>
-          <div class="source-badge">
-            <span>🐙</span>
-            <div>
-              <div>GitHub Issues</div>
-              <div class="source-url">POST /github-webhook</div>
-            </div>
-          </div>
-          <div class="source-badge">
-            <span>💬</span>
-            <div>
-              <div>Slack /agent</div>
-              <div class="source-url">POST /slack</div>
-            </div>
-          </div>
-          <div class="source-badge">
-            <span>🌐</span>
-            <div>
-              <div>HTTP / curl</div>
-              <div class="source-url">POST /run  {"task":"..."}</div>
-            </div>
-          </div>
+          <div class="source-badge"><span>💻</span><div><div>Terminal CLI</div><div class="source-url">node agents/cli.js "task"</div></div></div>
+          <div class="source-badge"><span>📧</span><div><div>Email Webhook</div><div class="source-url">POST /email-webhook</div></div></div>
+          <div class="source-badge"><span>🐙</span><div><div>GitHub Issues</div><div class="source-url">POST /github-webhook</div></div></div>
+          <div class="source-badge"><span>💬</span><div><div>Slack /agent</div><div class="source-url">POST /slack</div></div></div>
+          <div class="source-badge"><span>🌐</span><div><div>HTTP / curl</div><div class="source-url">POST /run {"task":"…"}</div></div></div>
         </div>
       </div>
     </div>
@@ -205,103 +194,149 @@
 </div>
 
 <script>
-const log   = document.getElementById('log');
-const dot   = document.getElementById('dot');
-const connL = document.getElementById('conn-label');
+const log      = document.getElementById('log');
+const inspector= document.getElementById('inspector');
 
-function ts() {
-  return new Date().toLocaleTimeString('en-GB', { hour12: false });
-}
+function ts() { return new Date().toLocaleTimeString('en-GB',{hour12:false}); }
 
-function addLog(msg, cls = 'c-info') {
+// ── Log panel ──────────────────────────────────────────────────────────────
+function addLog(msg, cls='c-info') {
   const line = document.createElement('div');
   line.className = 'log-line';
-  line.innerHTML = `<span class="log-time">${ts()}</span><span class="log-msg ${cls}">${msg}</span>`;
+  // hide the APPROVAL_REQUIRED sentinel from the log
+  if (msg === 'APPROVAL_REQUIRED') return;
+  line.innerHTML = `<span class="log-time">${ts()}</span><span class="log-msg ${cls}">${escHtml(msg)}</span>`;
   log.appendChild(line);
   log.scrollTop = log.scrollHeight;
 }
+function clearLog() { log.innerHTML=''; addLog('Log cleared'); }
 
-function clearLog() {
-  log.innerHTML = '';
-  addLog('Log cleared', 'c-info');
+// ── Inspector panel ────────────────────────────────────────────────────────
+let inspectorEmpty = true;
+
+function addInspectCard({ agent, phase, title, content, meta }) {
+  if (inspectorEmpty) { inspector.innerHTML=''; inspectorEmpty=false; }
+
+  const agentClass = agent.toLowerCase().replace(' ','-');
+  const metaStr = meta
+    ? `${meta.tokens} tokens · ${meta.ms}ms`
+    : '';
+
+  const card = document.createElement('div');
+  card.className = `inspect-card ${agentClass}`;
+
+  // colour-code diffs
+  let rendered = escHtml(content || '');
+  if (phase === 'diff') {
+    rendered = rendered
+      .split('\n')
+      .map(l => l.startsWith('+') ? `<span class="diff-add">${l}</span>`
+               : l.startsWith('-') ? `<span class="diff-rem">${l}</span>` : l)
+      .join('\n');
+  }
+
+  card.innerHTML = `
+    <div class="ic-header" onclick="toggleCard(this)">
+      <span class="ic-title">${escHtml(title)}</span>
+      <span class="ic-meta">${metaStr}</span>
+      <span class="ic-chevron">▼</span>
+    </div>
+    <div class="ic-body">
+      <pre>${rendered}</pre>
+    </div>`;
+
+  inspector.appendChild(card);
+  inspector.scrollTop = inspector.scrollHeight;
+}
+
+function toggleCard(header) {
+  header.classList.toggle('open');
+  header.nextElementSibling.classList.toggle('open');
+}
+
+function clearInspector() {
+  inspector.innerHTML = '<p style="padding:12px;font-size:.75rem;color:#334155">Run a task to see internal agent data here.</p>';
+  inspectorEmpty = true;
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
 }
 
 function setStep(step, status) {
   const el = document.getElementById(`s-${step}`);
-  const labels = { idle:'idle', running:'running…', done:'done ✓', failed:'failed ✗', waiting:'awaiting you' };
+  const labels = {idle:'idle',running:'running…',done:'done ✓',failed:'failed ✗',waiting:'awaiting you'};
   el.textContent = labels[status] || status;
   el.className = `step-status s-${status}`;
 }
+function resetPipeline() { ['ui','qa','merge'].forEach(s=>setStep(s,'idle')); }
 
-function resetPipeline() {
-  ['ui','qa','merge'].forEach(s => setStep(s, 'idle'));
-}
-
-// ── SSE: live log stream ──────────────────────────────────────────────────────
+// ── SSE ────────────────────────────────────────────────────────────────────
 function connectSSE() {
   const es = new EventSource('/events');
+  const dot = document.getElementById('dot');
+  const connL = document.getElementById('conn-label');
 
   es.onopen = () => {
-    dot.style.background = '#22c55e';
-    dot.style.boxShadow  = '0 0 8px #22c55e';
+    dot.style.cssText = 'background:#22c55e;box-shadow:0 0 8px #22c55e';
     connL.textContent = 'Connected';
   };
-
   es.onerror = () => {
-    dot.style.background = '#f87171';
-    dot.style.boxShadow  = '0 0 8px #f87171';
+    dot.style.cssText = 'background:#f87171;box-shadow:0 0 8px #f87171';
     connL.textContent = 'Reconnecting…';
     setTimeout(connectSSE, 3000);
     es.close();
   };
 
-  es.addEventListener('log', (e) => {
+  // plain log lines
+  es.addEventListener('log', e => {
     const { msg, type } = JSON.parse(e.data);
-    const cls = {
-      start:'c-start', ui:'c-ui', qa:'c-qa', merge:'c-merge',
-      success:'c-success', error:'c-error', file:'c-file', prompt:'c-prompt'
-    }[type] || 'c-info';
+    const cls = {start:'c-start',ui:'c-ui',qa:'c-qa',merge:'c-merge',
+                 success:'c-success',error:'c-error',file:'c-file',
+                 prompt:'c-prompt'}[type] || 'c-info';
     addLog(msg, cls);
 
-    // Update pipeline steps
-    if (type === 'start')           { resetPipeline(); }
-    if (msg.includes('[UI Agent]')) { setStep('ui', 'running'); setStep('qa','idle'); setStep('merge','idle'); }
-    if (msg.includes('Edited:'))    { /* keep running */ }
-    if (msg.includes('[QA Agent]')) { setStep('ui', 'done'); setStep('qa','running'); }
-    if (type === 'qa' && msg.includes('PASS')) { /* keep */ }
-    if (msg.includes('[Merge Agent]')) { setStep('qa','done'); setStep('merge','waiting'); }
-    if (type === 'prompt' && msg.includes('APPROVAL_REQUIRED')) { showApproval(); document.getElementById('run-btn').disabled = false; }
-    if (msg.includes('Pushed!'))    { setStep('merge','done'); document.getElementById('run-btn').disabled = false; }
-    if (msg.includes('cancelled'))  { setStep('merge','idle'); document.getElementById('run-btn').disabled = false; }
-    if (type === 'error')           { ['ui','qa','merge'].forEach(s => { if(document.getElementById(`s-${s}`).textContent.includes('running')) setStep(s,'failed'); }); document.getElementById('run-btn').disabled = false; }
+    if (type==='start')              { resetPipeline(); clearInspector(); }
+    if (msg.includes('[UI Agent]'))  { setStep('ui','running'); setStep('qa','idle'); setStep('merge','idle'); }
+    if (msg.includes('[QA Agent]'))  { setStep('ui','done'); setStep('qa','running'); }
+    if (msg.includes('[Merge Agent]')){ setStep('qa','done'); setStep('merge','waiting'); }
+    if (type==='prompt'&&msg==='APPROVAL_REQUIRED') { showApproval(); document.getElementById('run-btn').disabled=false; }
+    if (msg.includes('Pushed!'))     { setStep('merge','done'); document.getElementById('run-btn').disabled=false; }
+    if (msg.includes('cancelled'))   { setStep('merge','idle'); document.getElementById('run-btn').disabled=false; }
+    if (type==='error')              { document.getElementById('run-btn').disabled=false; }
+  });
+
+  // rich inspect cards
+  es.addEventListener('inspect', e => {
+    addInspectCard(JSON.parse(e.data));
   });
 }
 
 connectSSE();
 
-// ── Approve / Reject ──────────────────────────────────────────────────────────
+// ── Approval ───────────────────────────────────────────────────────────────
 async function decide(action) {
   document.getElementById('approval-banner').classList.remove('visible');
-  await fetch(`/${action}`, { method: 'POST' });
-  setStep('merge', action === 'approve' ? 'running' : 'idle');
+  await fetch(`/${action}`, { method:'POST' });
+  setStep('merge', action==='approve' ? 'running' : 'idle');
 }
-
 function showApproval() {
   document.getElementById('approval-banner').classList.add('visible');
 }
 
-// ── Send task ─────────────────────────────────────────────────────────────────
+// ── Run task ───────────────────────────────────────────────────────────────
 async function runTask() {
   const task = document.getElementById('task-input').value.trim();
   const autoMerge = document.getElementById('auto-merge').checked;
   if (!task) return;
-
   document.getElementById('run-btn').disabled = true;
-  addLog(`Sending task: "${task}"`, 'c-start');
-
+  addLog(`Sending: "${task}"`, 'c-start');
   await fetch('/run', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ task, autoMerge }),
   });
 }
